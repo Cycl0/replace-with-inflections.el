@@ -125,14 +125,14 @@ Fourth and fifth arg START and END (active region if interactive)
 specify the region to operate on."
   (interactive
    (let ((common
-	  (query-replace-read-args
-	   (concat "Query replace"
-		   (if current-prefix-arg " symbol" " name")
-		   (if (use-region-p) " in region" ""))
-	   nil)))
+          (query-replace-read-args
+             (concat "Query replace"
+                 (if current-prefix-arg " symbol" " name")
+                 (if (use-region-p) " in region" ""))
+             nil)))
      (list (nth 0 common) (nth 1 common) (nth 2 common)
-	   (if (use-region-p) (region-beginning))
-	   (if (use-region-p) (region-end)))))
+      (if (use-region-p) (region-beginning))
+      (if (use-region-p) (region-end)))))
   (let* ((from-singular (replace-with-inflections--singularize-string from-string))
          (from-plural (replace-with-inflections--pluralize-string from-string))
          (from-singular-p (string= from-string from-singular))
@@ -177,60 +177,115 @@ specify the region to operate on."
                                    matched))) nil)
                             nil start end))))
 
-(provide 'replace-with-inflections)
+;; (defun query-replace-with-inflections-no-prompt (from-string to-string &optional delimited start end)
+;;   "Replace all occurrences of FROM-STRING with TO-STRING without confirmation."
+;;   (interactive
+;;    (let ((common
+;;           (query-replace-read-args
+;;            (concat "Query replace"
+;;                    (if current-prefix-arg " symbol" " name")
+;;                    (if (use-region-p) " in region" ""))
+;;            nil)))
+;;      (list (nth 0 common) (nth 1 common) (nth 2 common)
+;;            (if (use-region-p) (region-beginning))
+;;            (if (use-region-p) (region-end)))))
+;;   (unless start (setq start (point-min)))
+;;   (unless end (setq end (point-max)))
+;;   (let* ((from-singular (replace-with-inflections--singularize-string from-string))
+;;          (from-plural (replace-with-inflections--pluralize-string from-string))
+;;          (to-singular (replace-with-inflections--singularize-string to-string))
+;;          (to-plural (replace-with-inflections--pluralize-string to-string))
+;;          (string-inflection-functions '(string-inflection-underscore-function
+;;                                         string-inflection-upcase-function
+;;                                         string-inflection-pascal-case-function
+;;                                         string-inflection-camelcase-function
+;;                                         string-inflection-kebab-case-function
+;;                                         string-inflection-capital-underscore-function))
+;;          (from-inflections (cl-mapcan (lambda (func)
+;;                                         (list (funcall func from-singular)
+;;                                               (funcall func from-plural)))
+;;                                       string-inflection-functions))
+;;          (regexp (regexp-opt from-inflections (if delimited 'symbols t)))
+;;          (re-singulars (concat "\\`" (regexp-opt (list from-singular) t) "\\'"))
+;;          (re-plurals (concat "\\`" (regexp-opt (list from-plural) t) "\\'")))
+;;     (save-excursion
+;;       (goto-char start)
+;;       (while (re-search-forward regexp end t)
+;;         (let ((matched (match-string 0)))
+;;           (replace-match
+;;            (replace-with-inflections--format-string-like
+;;             (if (or (string-match-p re-singulars matched)
+;;                     (not (string-match-p re-plurals matched)))
+;;                 to-singular
+;;               to-plural)
+;;             matched)
+;;            t t))))))
 
-(defun query-replace-with-inflections-no-prompt (from-string to-string &optional delimited start end)
-  "Replace all occurrences of FROM-STRING with TO-STRING without confirmation."
+;; (defun replace-with-inflections--format-string-like (format-string ref-string)
+;;   "Format FORMAT-STRING to match the case of REF-STRING.
+;; If REF-STRING is all uppercase, FORMAT-STRING is converted to uppercase.
+;; If REF-STRING is capitalized, FORMAT-STRING is capitalized."
+;;   (cond
+;;    ((string= ref-string (upcase ref-string)) (upcase format-string))
+;;    ((string= ref-string (capitalize ref-string)) (capitalize format-string))
+;;    (t format-string)))
+
+;;;###autoload
+(defun replace-with-inflections-no-query (from-string to-string &optional delimited start end)
+  "Replace various forms of FROM-STRING with those of TO-STRING without prompting."
   (interactive
    (let ((common
           (query-replace-read-args
-           (concat "Query replace"
-                   (if current-prefix-arg " symbol" " name")
-                   (if (use-region-p) " in region" ""))
-           nil)))
+             (concat "Query replace"
+                 (if current-prefix-arg " symbol" " name")
+                 (if (use-region-p) " in region" ""))
+             nil)))
      (list (nth 0 common) (nth 1 common) (nth 2 common)
-           (if (use-region-p) (region-beginning))
-           (if (use-region-p) (region-end)))))
-  (unless start (setq start (point-min)))
-  (unless end (setq end (point-max)))
+      (if (use-region-p) (region-beginning))
+      (if (use-region-p) (region-end)))))
   (let* ((from-singular (replace-with-inflections--singularize-string from-string))
          (from-plural (replace-with-inflections--pluralize-string from-string))
+         (from-singular-p (string= from-string from-singular))
+         (from-plural-p (string= from-string from-plural))
          (to-singular (replace-with-inflections--singularize-string to-string))
          (to-plural (replace-with-inflections--pluralize-string to-string))
+         (to-singular-p (string= to-string to-singular))
+         (to-plural-p (string= to-string to-plural))
+         ;; If the pluraliries of FROM-STRING and TO-STRING do not
+         ;; seem to match, disable support for number inflections.
+         (number-inflection-p (or (and from-singular-p to-singular-p)
+                                  (and from-plural-p to-plural-p)))
+         (from-singular (if number-inflection-p from-singular from-string))
+         (to-singular (if number-inflection-p to-singular to-string))
          (string-inflection-functions '(string-inflection-underscore-function
                                         string-inflection-upcase-function
                                         string-inflection-pascal-case-function
                                         string-inflection-camelcase-function
                                         string-inflection-kebab-case-function
                                         string-inflection-capital-underscore-function))
-         (from-inflections (cl-mapcan (lambda (func)
-                                        (list (funcall func from-singular)
-                                              (funcall func from-plural)))
-                                      string-inflection-functions))
-         (regexp (regexp-opt from-inflections (if delimited 'symbols t)))
-         (re-singulars (concat "\\`" (regexp-opt (list from-singular) t) "\\'"))
-         (re-plurals (concat "\\`" (regexp-opt (list from-plural) t) "\\'")))
-    (save-excursion
-      (goto-char start)
-      (while (re-search-forward regexp end t)
-        (let ((matched (match-string 0)))
-          (replace-match
-           (replace-with-inflections--format-string-like
-            (if (or (string-match-p re-singulars matched)
-                    (not (string-match-p re-plurals matched)))
-                to-singular
-              to-plural)
-            matched)
-           t t))))))
+         (from-singulars (mapcar #'(lambda (func) (funcall func from-singular))
+                                 string-inflection-functions))
+         (from-plurals (if number-inflection-p
+                           (mapcar #'(lambda (func) (funcall func from-plural))
+                                   string-inflection-functions)))
+         (regexp (regexp-opt (append from-plurals from-singulars)
+                             (if delimited 'symbols t)))
+         (re-singulars (concat "\\`" (regexp-opt from-singulars t) "\\'"))
+         (orig-query-replace-descr (symbol-function 'query-replace-descr)))
+    (cl-letf (((symbol-function 'query-replace-descr)
+               (lambda (string)
+                 (funcall orig-query-replace-descr
+                          (if (string-equal string regexp)
+                              (match-string 1) ;; show the matched name instead of the regexp pattern
+                            string)))))
+      (replace-regexp regexp
+                            `((lambda (_ count)
+                                (let ((matched (match-string 1)))
+                                  (replace-with-inflections--format-string-like
+                                   (if (string-match-p ,re-singulars matched)
+                                       ,to-singular ,to-plural)
+                                   matched))) nil)
+                            nil start end))))
 
-(defun replace-with-inflections--format-string-like (format-string ref-string)
-  "Format FORMAT-STRING to match the case of REF-STRING.
-If REF-STRING is all uppercase, FORMAT-STRING is converted to uppercase.
-If REF-STRING is capitalized, FORMAT-STRING is capitalized."
-  (cond
-   ((string= ref-string (upcase ref-string)) (upcase format-string))
-   ((string= ref-string (capitalize ref-string)) (capitalize format-string))
-   (t format-string)))
-
-(provide 'query-replace-with-inflections-no-prompt)
+(provide 'replace-with-inflections)
 ;;; replace-with-inflections.el ends here
